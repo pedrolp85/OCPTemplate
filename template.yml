@@ -1,0 +1,278 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+labels:
+  template: php-mysql-ephemeral
+message: |
+  The following service(s) have been created in your project: ${NAME}, ${DATABASE_SERVICE_NAME}.
+metadata:
+  annotations:
+    description: |-
+      A  PHP application with a MySQL database.
+      WARNING: Any data stored will be lost upon pod destruction. Only use this template for testing.
+    iconClass: icon-php
+    openshift.io/display-name: PHP + MySQL (Ephemeral)
+    tags: php
+    template.openshift.io/long-description: This template defines resources needed
+      to develop a PHP application, including a build configuration, application deployment
+      configuration, and database deployment configuration.  The database is stored
+      in non-persistent storage, so this configuration should be used for experimental
+      purposes only.
+    template.openshift.io/provider-display-name: Red Hat Training
+  creationTimestamp: "2023-03-04T14:24:50Z"
+  name: php-mysql-ephemeral
+  namespace: templating
+  resourceVersion: "205433"
+  uid: 34cce8d6-6da8-4f57-9ef4-ee1bef0b7535
+objects:
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    labels:
+      app: ${NAME}
+    name: ${NAME}
+  stringData:
+    database-password: ${DATABASE_PASSWORD}
+    database-user: ${DATABASE_USER}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      description: Exposes and load balances the application pods
+      service.alpha.openshift.io/dependencies: '[{"name": "${DATABASE_SERVICE_NAME}",
+        "kind": "Service"}]'
+    labels:
+      app: ${NAME}
+    name: ${NAME}
+  spec:
+    ports:
+    - name: web
+      port: 8080
+      targetPort: 8080
+    selector:
+      app: ${NAME}
+- apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    annotations:
+      template.openshift.io/expose-uri: http://{.spec.host}{.spec.path}
+    labels:
+      app: ${NAME}
+    name: ${NAME}
+  spec:
+    host: ${APPLICATION_DOMAIN}
+    to:
+      kind: Service
+      name: ${NAME}
+- apiVersion: image.openshift.io/v1
+  kind: ImageStream
+  metadata:
+    annotations:
+      description: Keeps track of changes in the application image
+    labels:
+      app: ${NAME}
+    name: ${NAME}
+  spec:
+    lookupPolicy:
+      local: true
+- apiVersion: build.openshift.io/v1
+  kind: BuildConfig
+  metadata:
+    annotations:
+      description: Defines how to build the application
+    labels:
+      app: ${NAME}
+    name: ${NAME}
+  spec:
+    output:
+      to:
+        kind: ImageStreamTag
+        name: ${NAME}:latest
+    source:
+      contextDir: ${CONTEXT_DIR}
+      git:
+        ref: ${SOURCE_REPOSITORY_REF}
+        uri: ${SOURCE_REPOSITORY_URL}
+      type: Git
+    strategy:
+      sourceStrategy:
+        from:
+          kind: ImageStreamTag
+          name: php:7.4-ubi8
+          namespace: ${NAMESPACE}
+      type: Source
+    triggers:
+    - type: ImageChange
+    - type: ConfigChange
+    - github:
+        secret: ${GITHUB_WEBHOOK_SECRET}
+      type: GitHub
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      description: Defines how to deploy the PHP application
+    labels:
+      app: ${NAME}
+    name: ${NAME}
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: ${NAME}
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          app: ${NAME}
+        name: ${NAME}
+      spec:
+        containers:
+        - env:
+          - name: DATABASE_SERVICE_NAME
+            value: ${DATABASE_SERVICE_NAME}
+          - name: DATABASE_NAME
+            value: ${DATABASE_NAME}
+          - name: DATABASE_USER
+            valueFrom:
+              secretKeyRef:
+                key: database-user
+                name: ${NAME}
+          - name: DATABASE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: database-password
+                name: ${NAME}
+          image: ${NAME}:latest
+          name: php-app
+          ports:
+          - containerPort: 8080
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      description: Exposes the database server
+    labels:
+      app: ${DATABASE_SERVICE_NAME}
+    name: ${DATABASE_SERVICE_NAME}
+  spec:
+    ports:
+    - name: mysql
+      port: 3306
+      targetPort: 3306
+    selector:
+      app: ${DATABASE_SERVICE_NAME}
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      description: Defines how to deploy the database
+    labels:
+      app: ${DATABASE_SERVICE_NAME}
+    name: ${DATABASE_SERVICE_NAME}
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: ${DATABASE_SERVICE_NAME}
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          app: ${DATABASE_SERVICE_NAME}
+        name: ${DATABASE_SERVICE_NAME}
+      spec:
+        containers:
+        - env:
+          - name: MYSQL_USER
+            valueFrom:
+              secretKeyRef:
+                key: database-user
+                name: ${NAME}
+          - name: MYSQL_ROOT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: database-password
+                name: ${NAME}
+          - name: MYSQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: database-password
+                name: ${NAME}
+          - name: MYSQL_DATABASE
+            value: ${DATABASE_NAME}
+          image: image-registry.openshift-image-registry.svc:5000/openshift/mysql:8.0-el8
+          livenessProbe:
+            initialDelaySeconds: 30
+            tcpSocket:
+              port: 3306
+            timeoutSeconds: 1
+          name: mysql
+          ports:
+          - containerPort: 3306
+          readinessProbe:
+            exec:
+              command:
+              - /bin/sh
+              - -i
+              - -c
+              - MYSQL_PWD='${DATABASE_PASSWORD}' mysql -h 127.0.0.1 -u ${DATABASE_USER}
+                -D ${DATABASE_NAME} -e 'SELECT 1'
+            initialDelaySeconds: 5
+            timeoutSeconds: 1
+          volumeMounts:
+          - mountPath: /var/lib/mysql
+            name: data
+        volumes:
+        - emptyDir: {}
+          name: data
+parameters:
+- description: The name assigned to all of the app objects defined in this template.
+  displayName: Name
+  name: NAME
+  required: true
+  value: php-app
+- description: The OpenShift Namespace where the S2I biulder ImageStream resides.
+  displayName: Namespace
+  name: NAMESPACE
+  required: true
+  value: openshift
+- description: The URL of the repository with your application source code.
+  displayName: Git Repository URL
+  name: SOURCE_REPOSITORY_URL
+  required: true
+- description: Set this to a branch name, tag or other ref of your repository if you
+    are not using the default branch.
+  displayName: Git Reference
+  name: SOURCE_REPOSITORY_REF
+- description: Set this to the relative path to your project if it is not in the root
+    of your repository.
+  displayName: Context Directory
+  name: CONTEXT_DIR
+- description: The exposed hostname that will route to the PHP app service, if left
+    blank a value will be defaulted.
+  displayName: Application Hostname
+  name: APPLICATION_DOMAIN
+- description: Github trigger secret.  A difficult to guess string encoded as part
+    of the webhook URL.  Not encrypted.
+  displayName: GitHub Webhook Secret
+  from: '[a-zA-Z0-9]{40}'
+  generate: expression
+  name: GITHUB_WEBHOOK_SECRET
+- displayName: Database Service Name
+  name: DATABASE_SERVICE_NAME
+  required: true
+  value: mysql
+- displayName: Database Name
+  name: DATABASE_NAME
+  required: true
+  value: phpapp
+- displayName: Database User
+  name: DATABASE_USER
+  required: true
+  value: php
+- displayName: Database Password
+  from: '[a-zA-Z0-9]{16}'
+  generate: expression
+  name: DATABASE_PASSWORD
