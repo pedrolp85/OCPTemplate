@@ -1,7 +1,8 @@
 apiVersion: template.openshift.io/v1
 kind: Template
 labels:
-  template: php-mysql-ephemeral
+  template: php-mysql
+
 message: |
   The following service(s) have been created in your project: ${NAME}, ${DATABASE_SERVICE_NAME}.
 metadata:
