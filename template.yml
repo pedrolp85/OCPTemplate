@@ -98,7 +98,7 @@ objects:
       sourceStrategy:
         from:
           kind: ImageStreamTag
-          name: php:7.4-ubi8
+          name: php:latest
           namespace: ${NAMESPACE}
       type: Source
     triggers:
