@@ -1,3 +1,5 @@
 <?php
-   print 'Hello ' .$_ENV["GREETING"] '. This app  returns a random funny quote. \n'
+   echo "Hello. This app  returns a random funny quote. \n";
+   echo 'My username is ' .$_ENV["DATABASE_NAME"] . '!';
+
 ?>
