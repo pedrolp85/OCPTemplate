@@ -1,7 +1,7 @@
 apiVersion: template.openshift.io/v1
 kind: Template
 labels:
-  template: php-mysql
+  app : exam
 
 message: |
   The following service(s) have been created in your project: ${NAME}, ${DATABASE_SERVICE_NAME}.
@@ -98,7 +98,7 @@ objects:
       sourceStrategy:
         from:
           kind: ImageStreamTag
-          name: php:latest
+          name: php:7.4-ubi8
           namespace: ${NAMESPACE}
       type: Source
     triggers:
