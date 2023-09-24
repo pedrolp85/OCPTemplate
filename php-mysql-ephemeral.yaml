@@ -20,8 +20,8 @@ metadata:
       purposes only.
     template.openshift.io/provider-display-name: Red Hat Training
   creationTimestamp: "2023-03-04T14:24:50Z"
-  name: php-mysql-ephemeral
-  namespace: templating
+  name: general_template
+  namespace: test_namespace
   resourceVersion: "205433"
   uid: 34cce8d6-6da8-4f57-9ef4-ee1bef0b7535
 objects:
@@ -233,12 +233,7 @@ parameters:
   displayName: Name
   name: NAME
   required: true
-  value: php-app
-- description: The OpenShift Namespace where the S2I biulder ImageStream resides.
-  displayName: Namespace
-  name: NAMESPACE
-  required: true
-  value: openshift
+  value: app-name
 - description: The URL of the repository with your application source code.
   displayName: Git Repository URL
   name: SOURCE_REPOSITORY_URL
